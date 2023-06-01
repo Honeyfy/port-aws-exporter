@@ -14,6 +14,3 @@ def lambda_handler(event, context):
     resources_handler = ResourcesHandler(config, context)
     resources_handler.handle()
     logger.info("Exiting...")
-
-
-
