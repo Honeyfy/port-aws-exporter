@@ -9,6 +9,7 @@ logger.setLevel(logging.INFO)
 
 def lambda_handler(event, context):
     logger.info("Load config")
+    print("event: %s" %event)
     config = get_config(event, context)
     logger.info("Handling resources")
     resources_handler = ResourcesHandler(config, context)

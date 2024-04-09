@@ -41,6 +41,7 @@ class ResourcesHandler:
             for record in self.event.get('Records'):
                 try:
                     resource = json.loads(record["body"])
+                    logger.info("loaded json: %s" % resource)
                     self._handle_event_resource(resource)
                 except Exception as e:
                     logger.error(f"Failed to handle event: {self.event}, error: {e}")
@@ -65,17 +66,18 @@ class ResourcesHandler:
     def _handle_event_resource(self, resource):
         assert 'identifier' in resource, "Event must include 'identifier'"
         assert 'region' in resource, "Event must include 'region'"
+        logger.info("Resource: %s" %resource)
+
         region = jq.first(resource['region'], resource)
         identifier = jq.first(resource['identifier'], resource)
-
         action_type = str(jq.first(resource.get('action', '"upsert"'), resource)).lower()
         assert action_type in ['upsert', 'delete'], f"Action should be one of 'upsert', 'delete'"
-
         resource_configs = [resource_config for resource_config in self.resources_config if
                             resource_config['kind'] == resource['resource_type']]
         assert resource_configs, f"Resource config not found for kind: {resource['resource_type']}"
 
         for resource_config in resource_configs:
+            logger.info("creating resource handler")
             resource_handler = create_resource_handler(resource_config, self.port_client, self.lambda_context, region)
             resource_handler.handle_single_resource_item(region, identifier, action_type)
 

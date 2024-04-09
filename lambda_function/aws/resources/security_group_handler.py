@@ -1,57 +1,39 @@
 import logging
 import boto3
 from aws.resources.extended_resource_handler import ExtendedResourceHandler
-from port.entities import create_entities_json, handle_entities
 
 logger = logging.getLogger(__name__)
 
 
 class SecurityGroupHandler(ExtendedResourceHandler):
+
     def __init__(self, resource_config, port_client, lambda_context, default_region):
         super().__init__(resource_config, port_client, lambda_context, default_region)
         self.ec2_client = boto3.client('ec2', region_name=self.region)
-        self.mappings = resource_config['port']['entity']['mappings'][0]
-        self.logger = logging.getLogger()
-        self.logger.setLevel(logging.INFO)
 
-    def handle(self):
-        # Fetch all Security Groups and process them
-        self.logger.info("Fetching all Security Groups")
-        response = self.ec2_client.describe_security_groups()
+    @ExtendedResourceHandler.backoff_retry(max_attempts=3, backoff_factor=2)
+    def fetch_resources(self):
+        try:
+            security_groups = []
+            paginator = self.ec2_client.get_paginator('describe_security_groups')
+            for page in paginator.paginate():
+                security_groups.extend(page['SecurityGroups'])
 
-        self.logger.info(f"Received {len(response['SecurityGroups'])} Security Groups")
+            for sg in security_groups:
+                sg['identifier'] = sg.get('GroupId')  # set identifier as 'GroupId'
+            return security_groups
+        except Exception as e:
+            logger.error(f"An error occurred while fetching the security groups: {e}")
+            return None
 
-        entities = []
-        for sg in response['SecurityGroups']:
-            entity = self.process_security_group(sg)
-            entities.append(entity)
-
-        # Handle the processed entities
-        self.logger.info("Processing Security Groups")
-        aws_entities = self.handle_entities(entities)
-
-        self.logger.info("Finished processing Security Groups")
-        return {'aws_entities': aws_entities}
-
-    def process_security_group(self, sg):
-        # Process security group and create the entity object
-        entity = {
-            'identifier': sg['GroupId'],
-            'title': sg['GroupName'],
-            'blueprint': 'aws_security_group',
-            'properties': {
-                'groupId': sg['GroupId'],
-                'groupName': sg['GroupName'],
-                'description': sg['Description'],
-                'vpcId': sg['VpcId']
-            },
-            'relations': {
-                'vpc': sg['VpcId']
-            }
-        }
-        return entity
-
-    def handle_entities(self, entities):
-        # Handle the entities by creating/updating them in Port
-        aws_entities = handle_entities(entities, self.port_client)
-        return aws_entities
+    @ExtendedResourceHandler.backoff_retry(max_attempts=3, backoff_factor=2)
+    def fetch_resource(self, group_id):
+        try:
+            response = self.ec2_client.describe_security_groups(GroupIds=[group_id])
+            if response.get('SecurityGroups'):
+                security_group = response['SecurityGroups'][0]
+                security_group['identifier'] = security_group.get('GroupId')  # set identifier as 'GroupId'
+                return security_group
+        except Exception as e:
+            logger.error(f"An error occurred while fetching the security group: {e}")
+            return None
