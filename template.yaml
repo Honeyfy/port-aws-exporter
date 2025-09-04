@@ -60,7 +60,7 @@ Globals:
     Timeout: 900
     MemorySize: 2048
     Handler: app.lambda_handler
-    Runtime: python3.9
+    Runtime: python3.11
     Layers:
       - !Ref RequirementsLayer
     Architectures:
@@ -111,9 +111,9 @@ Resources:
       CompatibleArchitectures:
         - arm64
       CompatibleRuntimes:
-        - python3.9
+        - python3.11
     Metadata:
-      BuildMethod: python3.9
+      BuildMethod: python3.11
       BuildArchitecture: arm64
 
   LambdaFunction:
